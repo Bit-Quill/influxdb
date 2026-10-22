@@ -250,6 +250,34 @@ The files are also read and parsed **once at startup** into an in-memory policy;
 enforcement never re-reads from disk. So any out-of-band edit to a file has no
 effect until the server is restarted.
 
+## Uninstalling packages
+
+A sibling capability removes packages from the plugin environment. It mirrors
+install across every layer (CLI, HTTP API, client, manager):
+
+```
+influxdb3 uninstall package <name...>
+  -> POST /api/v3/configure/plugin_environment/uninstall_packages
+  -> http.rs::uninstall_plugin_environment_packages
+  -> PythonEnvironmentManager::uninstall_packages(packages)
+  -> pip uninstall -y <name...>
+```
+
+Behavior:
+- **Name-only, no versions.** Only one version of a package can be installed in
+  the environment at a time, so uninstall takes bare names (matching
+  `pip uninstall`); a version would be meaningless.
+- **Ungated by the allowlist.** Uninstall is intentionally *not* checked against
+  the allowlist. The allowlist governs what may *enter* the environment;
+  removing a package only reduces attack surface, so it is always permitted,
+  even for packages not on the allowlist.
+- **Idempotent.** pip runs with `-y` (non-interactive) and treats an
+  already-absent package as a warning with a zero exit, so uninstalling a package
+  that is not installed succeeds.
+- **No requirements-file form.** Unlike install, there is no `-r` variant.
+- When package management is disabled (`--disable-package-management` or
+  `--package-manager disabled`), uninstall is rejected the same way install is.
+
 ## Known gaps / follow-ups
 
 - **Unpinned requests are always rejected, even if PyPI's latest is approved.**
